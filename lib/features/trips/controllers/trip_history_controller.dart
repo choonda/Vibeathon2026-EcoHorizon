@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/trip_record.dart';
+import '../models/trip_model.dart';
 import '../repositories/trip_repository.dart';
 import '../repositories/supabase_trip_repository.dart';
 
@@ -14,34 +14,39 @@ final tripRepositoryProvider = Provider<TripRepository>((ref) {
 // Add a mock repository for now
 class MockTripRepository implements TripRepository {
   @override
-  Future<List<TripRecord>> fetchTrips(String userId) async => [];
+  Future<void> uploadTrip(TripModel trip) async {}
+
   @override
-  Future<void> saveTrip(TripRecord record) async {}
+  Future<List<TripModel>> fetchUserTrips() async => [];
 }
 
 final tripHistoryControllerProvider =
-    StateNotifierProvider<TripHistoryController, AsyncValue<List<TripRecord>>>(
+    StateNotifierProvider<TripHistoryController, AsyncValue<List<TripModel>>>(
   (ref) {
     return TripHistoryController(ref.read(tripRepositoryProvider));
   },
 );
 
 class TripHistoryController
-    extends StateNotifier<AsyncValue<List<TripRecord>>> {
+    extends StateNotifier<AsyncValue<List<TripModel>>> {
   TripHistoryController(this._repository) : super(const AsyncValue.loading());
 
   final TripRepository _repository;
 
   Future<void> loadTrips(String userId) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.fetchTrips(userId));
+    state = await AsyncValue.guard(() => _repository.fetchUserTrips());
   }
 
   void clearTrips() {
-    state = const AsyncValue.data(<TripRecord>[]);
+    state = const AsyncValue.data(<TripModel>[]);
   }
 
-  Future<void> saveTrip(TripRecord record) async {
-    await _repository.saveTrip(record);
+  Future<void> saveTrip(TripModel trip) async {
+    await _repository.uploadTrip(trip);
+  }
+
+  Future<void> uploadTrip(TripModel trip) async {
+    await _repository.uploadTrip(trip);
   }
 }
