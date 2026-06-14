@@ -27,14 +27,7 @@ class SupabaseProfileRepository implements ProfileRepository {
 
     if (response == null) return null;
 
-    return UserProfile(
-      id: response['id'] as String,
-      name: response['name'] as String? ?? 'Driver',
-      fuelType: response['fuel_type'] as String? ?? 'RON95',
-      subsidyTier: response['subsidy_tier'] as String?,
-      petrolPointsBalance:
-          (response['petrol_points_balance'] as num?)?.toInt() ?? 0,
-    );
+    return UserProfile.fromJson(response as Map<String, dynamic>);
     */
   }
 
@@ -60,6 +53,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       fuelType: 'RON95',
       subsidyTier: null,
       petrolPointsBalance: 0,
+      totalEcoScore: 0,
     );
 
     await saveProfile(profile);
@@ -70,14 +64,9 @@ class SupabaseProfileRepository implements ProfileRepository {
   @override
   Future<void> saveProfile(UserProfile profile) async {
     // TODO: Requires Supabase API key
+    // Uses UserProfile.toJson() which maps field names to Supabase column names.
     /*
-    await _client.from('users').upsert({
-      'id': profile.id,
-      'name': profile.name,
-      'fuel_type': profile.fuelType,
-      'subsidy_tier': profile.subsidyTier,
-      'petrol_points_balance': profile.petrolPointsBalance,
-    });
+    await _client.from('users').upsert(profile.toJson());
     */
   }
 }

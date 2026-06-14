@@ -11,8 +11,27 @@ enum AppScreen {
 class AppNavigationNotifier extends StateNotifier<AppScreen> {
   AppNavigationNotifier() : super(AppScreen.onboarding);
 
+  /// Whether the user has already completed the onboarding flow at least once
+  /// during this app session. Used to skip onboarding on subsequent navigations.
+  bool hasCompletedOnboarding = false;
+
   void navigateTo(AppScreen screen) {
     state = screen;
+  }
+
+  /// Marks onboarding as complete and navigates to [AppScreen.dashboard].
+  void completeOnboarding() {
+    hasCompletedOnboarding = true;
+    state = AppScreen.dashboard;
+  }
+
+  /// Returns to dashboard, skipping onboarding if it has already been completed.
+  void navigateHome() {
+    if (hasCompletedOnboarding) {
+      state = AppScreen.dashboard;
+    } else {
+      state = AppScreen.onboarding;
+    }
   }
 }
 
