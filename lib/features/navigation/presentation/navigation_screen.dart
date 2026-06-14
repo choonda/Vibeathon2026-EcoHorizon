@@ -115,39 +115,30 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     const double size = 32.0;
     const double center = size / 2;
 
-    // Draw outer glow circle
+    // Draw outer glow circle (soft transparent blue)
     canvas.drawCircle(
       const Offset(center, center),
       14.0,
       ui.Paint()
-        ..color = const Color(0x262196F3) // Colors.blue.withOpacity(0.15)
+        ..color = const Color(0x332196F3) // ~20% opacity blue
         ..style = ui.PaintingStyle.fill,
     );
     
-    // Draw middle glow circle
+    // Draw white border ring
     canvas.drawCircle(
       const Offset(center, center),
-      10.0,
+      7.5,
       ui.Paint()
-        ..color = const Color(0x662196F3) // Colors.blue.withOpacity(0.4)
+        ..color = const Color(0xFFFFFFFF) // Crisp white border
         ..style = ui.PaintingStyle.fill,
     );
 
-    // Draw solid blue circle
+    // Draw solid blue inner dot
     canvas.drawCircle(
       const Offset(center, center),
-      7.0,
+      5.5,
       ui.Paint()
-        ..color = const Color(0xFF2196F3) // Colors.blue
-        ..style = ui.PaintingStyle.fill,
-    );
-
-    // Draw white center dot
-    canvas.drawCircle(
-      const Offset(center, center),
-      3.5,
-      ui.Paint()
-        ..color = const Color(0xFFFFFFFF) // Colors.white
+        ..color = const Color(0xFF2196F3) // Solid blue
         ..style = ui.PaintingStyle.fill,
     );
 
@@ -261,20 +252,6 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     
     // Haptic feedback
     HapticFeedback.vibrate();
-
-    // Flash red edge warning
-    setState(() {
-      _flashRedBorder = true;
-    });
-
-    // Reset warning after 500ms
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      setState(() {
-        _flashRedBorder = false;
-      });
-      ref.read(driveScoreNotifierProvider.notifier).clearWarning();
-    });
   }
 
   void _endDriving() {
@@ -308,6 +285,18 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DriveScoreState>(driveScoreNotifierProvider, (previous, next) {
+      if (next.isWarning && !(previous?.isWarning ?? false)) {
+        setState(() {
+          _flashRedBorder = true;
+        });
+      } else if (!next.isWarning && (previous?.isWarning ?? false)) {
+        setState(() {
+          _flashRedBorder = false;
+        });
+      }
+    });
+
     final mapState = ref.watch(mapControllerProvider);
     final routeState = mapState.routesState;
     final selectedRoute = mapState.selectedRoute ?? RouteOption.demoA();
@@ -599,49 +588,6 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           ],
 
           if (!_isLoadingRoutes && _mapState == MapState.driving) ...[
-            // Top Turn Indicator Floating Bar
-            Positioned(
-              top: 24,
-              left: 20,
-              right: 20,
-              child: SafeArea(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.border, width: 1.5),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.turn_right_rounded, color: AppColors.primary, size: 36),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'In 200m turn right into Jalan Universiti',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Eco route active',
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
             // Top Right Gamified Panel: Circular Progress Wrapping Eco Score
             Positioned(
               top: 120,
