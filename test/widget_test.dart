@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ecohorizon/app.dart';
 import 'package:ecohorizon/features/auth/controllers/auth_controller.dart';
-import 'package:ecohorizon/features/auth/controllers/profile_controller.dart' hide MockProfileRepository;
-import 'package:ecohorizon/features/auth/repositories/profile_repository.dart';
+import 'package:ecohorizon/features/auth/controllers/profile_controller.dart';
 import 'package:ecohorizon/features/trips/controllers/trip_history_controller.dart' hide MockTripRepository;
 import 'package:ecohorizon/features/trips/repositories/trip_repository.dart';
 
