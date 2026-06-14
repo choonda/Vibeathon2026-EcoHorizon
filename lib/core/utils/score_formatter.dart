@@ -1,0 +1,1 @@
+String formatEcoScore(int score) => '${score.clamp(0, 100)} pts';

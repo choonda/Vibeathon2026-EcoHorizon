@@ -1,0 +1,24 @@
+name: ecohorizon
+description: EcoHorizon - AI fuel management and eco driving app
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  fl_chart: ^1.2.0
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  google_maps_flutter: ^2.7.0
+  http: ^1.2.1
+  sensors_plus: ^6.1.0
+  supabase_flutter: ^2.5.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
