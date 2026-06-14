@@ -17,17 +17,18 @@ class EcoCostCalculator {
     required String fuelType,
     String? subsidyTier,
     bool isEcoFriendlyRoute = false,
+    double? consumptionOverrideLper100km, // optional direct override (e.g. 9.5 for highway)
   }) {
     // Baseline consumption (L/100km)
-    double baseLtrPer100Km = switch (fuelType.toUpperCase()) {
+    double baseLtrPer100Km = consumptionOverrideLper100km ?? switch (fuelType.toUpperCase()) {
       'DIESEL' => 6.0,
-      'RON97' => 7.8,
-      'RON95' => 7.2,
-      _ => 7.2,
+      'RON97'  => 7.8,
+      'RON95'  => 7.2,
+      _        => 7.2,
     };
 
-    // Adjust based on average speed (traffic idling vs smooth highway cruising)
-    if (durationMinutes > 0) {
+    // Adjust based on average speed — only when no manual override is given
+    if (consumptionOverrideLper100km == null && durationMinutes > 0) {
       final avgSpeed = distanceKm / (durationMinutes / 60.0);
       if (avgSpeed < 25.0) {
         // Congestion penalty (low speed stop-and-go)

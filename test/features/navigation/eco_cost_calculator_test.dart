@@ -86,5 +86,20 @@ void main() {
       expect(result.litersUsed, equals(6.48));
       expect(result.fuelCostRm, equals(13.28));
     });
+
+    test('Consumption override parameter is respected', () {
+      final result = EcoCostCalculator.calculate(
+        distanceKm: 100.0,
+        durationMinutes: 80,
+        fuelType: 'RON95',
+        subsidyTier: 'BUDI95',
+        consumptionOverrideLper100km: 9.5,
+      );
+
+      // Liters used = 9.5 L
+      // Cost = 9.5 * 2.05 = RM 19.475 -> 19.47 in Dart double.toStringAsFixed(2)
+      expect(result.litersUsed, equals(9.5));
+      expect(result.fuelCostRm, equals(19.47));
+    });
   });
 }
