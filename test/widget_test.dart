@@ -2,22 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:ecohorizon/app.dart';
 import 'package:ecohorizon/features/auth/controllers/auth_controller.dart';
 import 'package:ecohorizon/features/auth/controllers/profile_controller.dart';
-import 'package:ecohorizon/features/trips/controllers/trip_history_controller.dart' hide MockTripRepository;
+import 'package:ecohorizon/features/trips/controllers/trip_history_controller.dart';
 import 'package:ecohorizon/features/trips/repositories/trip_repository.dart';
 
 class MockAuthController extends AuthController {
-  MockAuthController() : super();
-  /*
   MockAuthController()
       : super(SupabaseClient(
-          'https://mock.supabase.co',
-          'mockAnonKey',
+          'https://plffiyhtnznqeneamwdq.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsZmZpeWh0bnpucWVuZWFtd2RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDExNjcsImV4cCI6MjA5NzAxNzE2N30.eJnxd3O_Jek5b8so7Tg3dEpc3ysvd49vJKttgKrDmF4',
           authOptions: const AuthClientOptions(autoRefreshToken: false),
         ));
-  */
 }
 
 void main() {

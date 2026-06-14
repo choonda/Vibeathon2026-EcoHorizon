@@ -115,8 +115,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           final isSelected = _selectedFuel == fuel;
                           return Expanded(
                             child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedFuel = fuel),
+                              onTap: () => setState(() {
+                                _selectedFuel = fuel;
+                                if (fuel != 'RON95') {
+                                  _hasBudiSubsidy = false;
+                                }
+                              }),
                               child: Container(
                                 margin: EdgeInsets.only(
                                     right: fuel != 'Diesel' ? 8.0 : 0.0),
@@ -149,45 +153,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.border, width: 1.5),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Eligible for BUDI Madani?',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14)),
-                                  SizedBox(height: 2),
-                                  Text('BUDI Madani Subsidy',
-                                      style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 11)),
-                                ],
+                      if (_selectedFuel == 'RON95') ...[
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: AppColors.border, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Eligible for BUDI Madani?',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14)),
+                                    SizedBox(height: 2),
+                                    Text('BUDI Madani Subsidy',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Switch.adaptive(
-                              value: _hasBudiSubsidy,
-                              activeColor: AppColors.primary,
-                              onChanged: (val) =>
-                                  setState(() => _hasBudiSubsidy = val),
-                            ),
-                          ],
+                              Switch.adaptive(
+                                value: _hasBudiSubsidy,
+                                activeColor: AppColors.primary,
+                                onChanged: (val) =>
+                                    setState(() => _hasBudiSubsidy = val),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -254,7 +260,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   : _nameController.text.trim(),
                               fuelType: _selectedFuel,
                               subsidyTier:
-                                  _hasBudiSubsidy ? 'BUDI95' : null,
+                                  (_selectedFuel == 'RON95' && _hasBudiSubsidy) ? 'BUDI95' : null,
                               petrolPointsBalance:
                                   profile.petrolPointsBalance,
                             );
