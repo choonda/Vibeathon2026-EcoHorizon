@@ -6,18 +6,8 @@ import '../repositories/trip_repository.dart';
 import '../repositories/supabase_trip_repository.dart';
 
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
-  // TODO: Requires Supabase API key
-  // return SupabaseTripRepository(Supabase.instance.client);
-  return MockTripRepository();
+  return SupabaseTripRepository(Supabase.instance.client);
 });
-
-// Add a mock repository for now
-class MockTripRepository implements TripRepository {
-  @override
-  Future<List<TripRecord>> fetchTrips(String userId) async => [];
-  @override
-  Future<void> saveTrip(TripRecord record) async {}
-}
 
 final tripHistoryControllerProvider =
     StateNotifierProvider<TripHistoryController, AsyncValue<List<TripRecord>>>(

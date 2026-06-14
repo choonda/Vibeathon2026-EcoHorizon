@@ -48,15 +48,10 @@ class _EcoHorizonAppState extends ConsumerState<EcoHorizonApp> {
       theme: AppTheme.dark(),
       home: authSession.when(
         data: (session) {
-          // TODO: Requires Supabase API key - Bypassing sign in for now
-          return const MainRouterScreen();
-          /*
           if (session == null) {
             return const SignInPage();
           }
-
           return const MainRouterScreen();
-          */
         },
         loading: () => const Scaffold(
           body: Center(child: CircularProgressIndicator()),

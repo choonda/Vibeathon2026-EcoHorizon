@@ -7,18 +7,13 @@ class SupabaseProfileRepository implements ProfileRepository {
   SupabaseProfileRepository(this._client);
 
   factory SupabaseProfileRepository.fromProvider() {
-    // TODO: Requires Supabase API key
-    throw UnimplementedError('Supabase is not initialized');
-    // return SupabaseProfileRepository(Supabase.instance.client);
+    return SupabaseProfileRepository(Supabase.instance.client);
   }
 
   final SupabaseClient _client;
 
   @override
   Future<UserProfile?> fetchCurrentProfile() async {
-    // TODO: Requires Supabase API key
-    return null;
-    /*
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return null;
 
@@ -35,14 +30,10 @@ class SupabaseProfileRepository implements ProfileRepository {
       petrolPointsBalance:
           (response['petrol_points_balance'] as num?)?.toInt() ?? 0,
     );
-    */
   }
 
   @override
   Future<UserProfile> ensureCurrentProfile() async {
-    // TODO: Requires Supabase API key
-    return UserProfile.demo();
-    /*
     final existing = await fetchCurrentProfile();
     if (existing != null) {
       return existing;
@@ -64,13 +55,10 @@ class SupabaseProfileRepository implements ProfileRepository {
 
     await saveProfile(profile);
     return profile;
-    */
   }
 
   @override
   Future<void> saveProfile(UserProfile profile) async {
-    // TODO: Requires Supabase API key
-    /*
     await _client.from('users').upsert({
       'id': profile.id,
       'name': profile.name,
@@ -78,6 +66,5 @@ class SupabaseProfileRepository implements ProfileRepository {
       'subsidy_tier': profile.subsidyTier,
       'petrol_points_balance': profile.petrolPointsBalance,
     });
-    */
   }
 }

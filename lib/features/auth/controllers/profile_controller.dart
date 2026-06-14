@@ -6,20 +6,8 @@ import '../repositories/profile_repository.dart';
 import '../repositories/supabase_profile_repository.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
-  // TODO: Requires Supabase API key
-  // return SupabaseProfileRepository.fromProvider();
-  return MockProfileRepository();
+  return SupabaseProfileRepository(Supabase.instance.client);
 });
-
-// Add a mock repository for now
-class MockProfileRepository implements ProfileRepository {
-  @override
-  Future<UserProfile> ensureCurrentProfile() async => UserProfile.demo();
-  @override
-  Future<UserProfile?> fetchCurrentProfile() async => UserProfile.demo();
-  @override
-  Future<void> saveProfile(UserProfile profile) async {}
-}
 
 final profileControllerProvider =
     StateNotifierProvider<ProfileController, AsyncValue<UserProfile?>>((ref) {
@@ -33,25 +21,13 @@ class ProfileController extends StateNotifier<AsyncValue<UserProfile?>> {
 
   Future<void> loadProfile() async {
     state = const AsyncValue.loading();
-    // TODO: Requires Supabase API key
-    loadDemoProfile();
-    /*
-    SupabaseClient? client;
-    try {
-      client = Supabase.instance.client;
-    } catch (_) {
-      state = const AsyncValue.data(null);
-      return;
-    }
-
+    final client = Supabase.instance.client;
     final session = client.auth.currentSession;
     if (session == null) {
       state = const AsyncValue.data(null);
       return;
     }
-
     state = await AsyncValue.guard(_repository.ensureCurrentProfile);
-    */
   }
 
   Future<void> loadDemoProfile() async {
