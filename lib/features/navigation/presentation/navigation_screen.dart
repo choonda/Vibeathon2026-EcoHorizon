@@ -36,6 +36,10 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   bool _showingPetrolStation = false;
   bool _refueledSuccess = false;
   bool _lowFuelAlertShown = false; // prevents repeated auto-alerts per trip
+  bool _isDetouring = false;
+  bool _detourCompleted = false;
+  int _detourStationIndex = -1;
+  List<LatLng> _activeRoutePoints = [];
 
   GoogleMapController? _googleMapController;
   late TextEditingController _searchController;
@@ -225,6 +229,10 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       _currentSpeed = 72.0;
       _blinkOn = true;
       _lowFuelAlertShown = false; // reset alert guard for new trip
+      _isDetouring = false;
+      _detourCompleted = false;
+      _detourStationIndex = -1;
+      _activeRoutePoints = List.from(selectedRoute.polylinePoints);
     });
 
     ref.read(driveScoreNotifierProvider.notifier).startTrip();
@@ -234,7 +242,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     _tripTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
       if (!mounted) return;
       setState(() {
-        _tripProgress += 0.02;
+        _tripProgress += 0.015; // slightly slower driving simulation for detour realism
         if (_tripProgress >= 1.0) {
           _tripProgress = 1.0;
           _tripTimer?.cancel();
@@ -243,15 +251,55 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
         }
       });
 
-      // Decrease fuel level progressively (0.3% per tick)
-      final apmAlertState = ref.read(apmAlertControllerProvider).valueOrNull;
-      if (apmAlertState != null) {
-        final currentFuel = (apmAlertState.virtualTankPercentage - 0.3).clamp(0.0, 100.0);
-        ref.read(apmAlertControllerProvider.notifier).updateVirtualTank(currentFuel);
+      // Decrease fuel level progressively (0.3% per tick) - freeze depletion when refueled
+      if (!_detourCompleted) {
+        final apmAlertState = ref.read(apmAlertControllerProvider).valueOrNull;
+        if (apmAlertState != null) {
+          final currentFuel = (apmAlertState.virtualTankPercentage - 0.3).clamp(0.0, 100.0);
+          ref.read(apmAlertControllerProvider.notifier).updateVirtualTank(currentFuel);
+        }
+      }
+
+      // Check if we reached the petrol station on our detour
+      if (_isDetouring && !_detourCompleted && _detourStationIndex != -1) {
+        final currentCarIndex = (_tripProgress * (_activeRoutePoints.length - 1)).floor();
+        if (currentCarIndex >= _detourStationIndex) {
+          _detourCompleted = true;
+          
+          // Reset virtual tank to 100%
+          ref.read(apmAlertControllerProvider.notifier).updateVirtualTank(100.0);
+
+          // Increment points balance by 50 points
+          final profile = ref.read(profileControllerProvider).value;
+          if (profile != null) {
+            ref.read(profileControllerProvider.notifier).updateProfile(
+                  name: profile.name,
+                  fuelType: profile.fuelType,
+                  subsidyTier: profile.subsidyTier,
+                  petrolPointsBalance: profile.petrolPointsBalance + 50,
+                );
+          }
+
+          HapticFeedback.lightImpact();
+
+          setState(() {
+            _refueledSuccess = true;
+            _lowFuelAlertShown = true;
+          });
+
+          // Show a success banner for 3 seconds
+          Timer(const Duration(seconds: 3), () {
+            if (mounted) {
+              setState(() {
+                _refueledSuccess = false;
+              });
+            }
+          });
+        }
       }
 
       // Animate camera to follow the car
-      final carPos = _getCarPosition(selectedRoute.polylinePoints, _tripProgress);
+      final carPos = _getCarPosition(_activeRoutePoints, _tripProgress);
       if (carPos != null && _googleMapController != null) {
         _googleMapController!.animateCamera(CameraUpdate.newLatLng(carPos));
       }
@@ -364,6 +412,78 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     });
   }
 
+  void _triggerRerouteAndRefuel() {
+    if (_activeRoutePoints.isEmpty) return;
+    
+    // Find where the car currently is
+    final currentCarIndex = (_tripProgress * (_activeRoutePoints.length - 1)).floor();
+
+    // Construct the detour route:
+    final List<LatLng> detourPoints = [];
+    
+    // 1. Points from start up to current car position
+    for (int i = 0; i <= currentCarIndex; i++) {
+      detourPoints.add(_activeRoutePoints[i]);
+    }
+
+    // 2. Intermediate turnoff towards the station
+    final currentPos = _activeRoutePoints[currentCarIndex];
+    final intermediateTurn = LatLng(
+      currentPos.latitude + (1.4820 - currentPos.latitude) * 0.5,
+      currentPos.longitude + (103.8050 - currentPos.longitude) * 0.5,
+    );
+    detourPoints.add(intermediateTurn);
+
+    // 3. The petrol station itself (Petronas Masai)
+    const stationLoc = LatLng(1.4820, 103.8050);
+    detourPoints.add(stationLoc);
+    final stationIndex = detourPoints.length - 1;
+
+    // 4. Re-entry point after the station towards destination (Seri Alam)
+    const destinationLoc = LatLng(1.4789, 103.8870);
+    const reEntryLoc = LatLng(1.4800, 103.8350);
+    detourPoints.add(reEntryLoc);
+
+    // 5. Points from the remaining route that are after the detour area
+    bool addedRemaining = false;
+    final mapState = ref.read(mapControllerProvider);
+    final originalRoutePoints = mapState.selectedRoute?.polylinePoints ?? RouteOption.demoA().polylinePoints;
+    
+    for (final pt in originalRoutePoints) {
+      if (pt.longitude > 103.8350) {
+        detourPoints.add(pt);
+        addedRemaining = true;
+      }
+    }
+    
+    // Fallback: if no points are further east, just add destination
+    if (!addedRemaining) {
+      detourPoints.add(destinationLoc);
+    }
+
+    // Calculate new progress to prevent jumps
+    final double newProgress = currentCarIndex / (detourPoints.length - 1);
+
+    setState(() {
+      _showingPetrolStation = false;
+      _isDetouring = true;
+      _detourStationIndex = stationIndex;
+      _activeRoutePoints = detourPoints;
+      _tripProgress = newProgress;
+    });
+
+    // Zoom camera slightly to show the detour route
+    _googleMapController?.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: const LatLng(1.4700, 103.7800),
+          northeast: const LatLng(1.5000, 103.8900), // Encompass Seri Alam destination too
+        ),
+        50.0,
+      ),
+    );
+  }
+
   void _endDriving() {
     _tripTimer?.cancel();
     _speedTimer?.cancel();
@@ -458,8 +578,8 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     // Build the set of markers dynamically adding the car marker during navigation
     final Set<Marker> displayMarkers = Set.from(mapState.markers);
     final Set<Circle> displayCircles = {};
-    if (_mapState == MapState.driving && selectedRoute.polylinePoints.isNotEmpty) {
-      final carPos = _getCarPosition(selectedRoute.polylinePoints, _tripProgress);
+    if (_mapState == MapState.driving && _activeRoutePoints.isNotEmpty) {
+      final carPos = _getCarPosition(_activeRoutePoints, _tripProgress);
       if (carPos != null) {
         displayMarkers.add(
           Marker(
@@ -489,6 +609,45 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       );
     }
 
+    // Build the set of polylines dynamically, showing the active route or detour preview
+    final Set<Polyline> displayPolylines = {};
+    if (_mapState == MapState.driving) {
+      if (_activeRoutePoints.isNotEmpty) {
+        displayPolylines.add(
+          Polyline(
+            polylineId: const PolylineId('active_route'),
+            points: _activeRoutePoints,
+            color: _isDetouring ? Colors.amber : const Color(0xFF10B981),
+            width: 8,
+            zIndex: 1,
+          ),
+        );
+      }
+    } else {
+      displayPolylines.addAll(mapState.polylines);
+    }
+
+    if (_showingPetrolStation) {
+      final startPos = (_mapState == MapState.driving)
+          ? (_getCarPosition(_activeRoutePoints, _tripProgress) ?? selectedRoute.polylinePoints.first)
+          : selectedRoute.polylinePoints.first;
+
+      displayPolylines.add(
+        Polyline(
+          polylineId: const PolylineId('detour_preview'),
+          points: [
+            startPos,
+            const LatLng(1.4820, 103.8050), // Petronas Masai
+            selectedRoute.polylinePoints.last, // Destination
+          ],
+          color: Colors.amber,
+          width: 6,
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+          zIndex: 5,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -502,7 +661,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
               ),
               markers: displayMarkers,
               circles: displayCircles,
-              polylines: mapState.polylines,
+              polylines: displayPolylines,
               onMapCreated: _onMapCreated,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
@@ -1208,7 +1367,13 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              onPressed: _refuelVehicle,
+                              onPressed: () {
+                                if (_mapState == MapState.driving) {
+                                  _triggerRerouteAndRefuel();
+                                } else {
+                                  _refuelVehicle();
+                                }
+                              },
                               child: const Text('Reroute & Refuel'),
                             ),
                           ),
