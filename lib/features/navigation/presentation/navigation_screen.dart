@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,8 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   Timer? _speedTimer;
   bool _flashRedBorder = false;
   bool _isLoadingRoutes = true;
+  bool _blinkOn = true;
+  BitmapDescriptor? _carIcon;
 
   GoogleMapController? _googleMapController;
   late TextEditingController _searchController;
@@ -73,6 +76,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: 'Mid Valley Southkey');
+    _initCarIcon();
     // Simulate "Cloud AI calculation" loading lag
     Timer(const Duration(milliseconds: 1500), () {
       if (mounted) {
@@ -90,6 +94,62 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     _speedTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initCarIcon() async {
+    try {
+      final icon = await _createBlueDotIcon();
+      if (mounted) {
+        setState(() {
+          _carIcon = icon;
+        });
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  Future<BitmapDescriptor> _createBlueDotIcon() async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final ui.Canvas canvas = ui.Canvas(pictureRecorder);
+    const double size = 32.0;
+    const double center = size / 2;
+
+    // Draw outer glow circle (soft transparent blue)
+    canvas.drawCircle(
+      const Offset(center, center),
+      14.0,
+      ui.Paint()
+        ..color = const Color(0x332196F3) // ~20% opacity blue
+        ..style = ui.PaintingStyle.fill,
+    );
+    
+    // Draw white border ring
+    canvas.drawCircle(
+      const Offset(center, center),
+      7.5,
+      ui.Paint()
+        ..color = const Color(0xFFFFFFFF) // Crisp white border
+        ..style = ui.PaintingStyle.fill,
+    );
+
+    // Draw solid blue inner dot
+    canvas.drawCircle(
+      const Offset(center, center),
+      5.5,
+      ui.Paint()
+        ..color = const Color(0xFF2196F3) // Solid blue
+        ..style = ui.PaintingStyle.fill,
+    );
+
+    final ui.Image image = await pictureRecorder.endRecording().toImage(size.toInt(), size.toInt());
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    
+    if (byteData != null) {
+      return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
+    }
+    
+    return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -151,6 +211,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       _mapState = MapState.driving;
       _tripProgress = 0.0;
       _currentSpeed = 72.0;
+      _blinkOn = true;
     });
 
     ref.read(driveScoreNotifierProvider.notifier).startTrip();
@@ -164,6 +225,8 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
         if (_tripProgress >= 1.0) {
           _tripProgress = 1.0;
           _tripTimer?.cancel();
+          _speedTimer?.cancel();
+          _currentSpeed = 0.0;
         }
       });
 
@@ -189,20 +252,6 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     
     // Haptic feedback
     HapticFeedback.vibrate();
-
-    // Flash red edge warning
-    setState(() {
-      _flashRedBorder = true;
-    });
-
-    // Reset warning after 500ms
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      setState(() {
-        _flashRedBorder = false;
-      });
-      ref.read(driveScoreNotifierProvider.notifier).clearWarning();
-    });
   }
 
   void _endDriving() {
@@ -236,6 +285,18 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DriveScoreState>(driveScoreNotifierProvider, (previous, next) {
+      if (next.isWarning && !(previous?.isWarning ?? false)) {
+        setState(() {
+          _flashRedBorder = true;
+        });
+      } else if (!next.isWarning && (previous?.isWarning ?? false)) {
+        setState(() {
+          _flashRedBorder = false;
+        });
+      }
+    });
+
     final mapState = ref.watch(mapControllerProvider);
     final routeState = mapState.routesState;
     final selectedRoute = mapState.selectedRoute ?? RouteOption.demoA();
@@ -243,6 +304,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
     // Build the set of markers dynamically adding the car marker during navigation
     final Set<Marker> displayMarkers = Set.from(mapState.markers);
+    final Set<Circle> displayCircles = {};
     if (_mapState == MapState.driving && selectedRoute.polylinePoints.isNotEmpty) {
       final carPos = _getCarPosition(selectedRoute.polylinePoints, _tripProgress);
       if (carPos != null) {
@@ -250,9 +312,10 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           Marker(
             markerId: const MarkerId('car'),
             position: carPos,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+            icon: _carIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+            alpha: 1.0,
             infoWindow: const InfoWindow(title: 'Simulated Vehicle'),
-            zIndex: 2,
+            zIndex: 3,
           ),
         );
       }
@@ -270,65 +333,20 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                 zoom: 12.0,
               ),
               markers: displayMarkers,
+              circles: displayCircles,
               polylines: mapState.polylines,
               onMapCreated: _onMapCreated,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               myLocationButtonEnabled: false,
-            ),
-          ),
-
-          // 2. Navigation Header / Back Button
-          Positioned(
-            top: 24,
-            left: 20,
-            right: 20,
-            child: SafeArea(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_mapState == MapState.driving) {
-                        _endDriving();
-                      } else {
-                        ref.read(appNavigationProvider.notifier).navigateTo(AppScreen.dashboard);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface.withOpacity(0.85),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.border, width: 1.5),
-                      ),
-                      child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                    ),
-                  ),
-                  
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface.withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.border, width: 1.5),
-                    ),
-                    child: Text(
-                      _mapState == MapState.comparison ? 'Select Route' : 'Driving Console',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ),
-
-                  const SizedBox(width: 48), // Balance spacer
-                ],
-              ),
+              compassEnabled: false,
             ),
           ),
 
           // 3. Search Bar for Destination Input
           if (!_isLoadingRoutes && _mapState == MapState.comparison)
             Positioned(
-              top: 100,
+              top: 24,
               left: 20,
               right: 20,
               child: SafeArea(
@@ -444,10 +462,11 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           if (!_isLoadingRoutes && _mapState == MapState.comparison) ...[
             // Route selection Bottom Sheet Overlay
             Positioned(
-              bottom: 20,
+              bottom: 95,
               left: 20,
               right: 20,
               child: SafeArea(
+                bottom: false,
                 child: routeState.when(
                   data: (routes) {
                     if (routes.isEmpty) {
@@ -486,7 +505,9 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? (isEco ? AppColors.primary.withOpacity(0.08) : Colors.white.withOpacity(0.05))
+                                        ? (isEco
+                                            ? Color.alphaBlend(AppColors.primary.withOpacity(0.08), AppColors.surface)
+                                            : Color.alphaBlend(Colors.white.withOpacity(0.05), AppColors.surface))
                                         : AppColors.surface,
                                     borderRadius: BorderRadius.circular(22),
                                     border: Border.all(
@@ -567,52 +588,9 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           ],
 
           if (!_isLoadingRoutes && _mapState == MapState.driving) ...[
-            // Top Turn Indicator Floating Bar
-            Positioned(
-              top: 100,
-              left: 20,
-              right: 20,
-              child: SafeArea(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.border, width: 1.5),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.turn_right_rounded, color: AppColors.primary, size: 36),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'In 200m turn right into Jalan Universiti',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Eco route active',
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
             // Top Right Gamified Panel: Circular Progress Wrapping Eco Score
             Positioned(
-              top: 196,
+              top: 120,
               right: 20,
               child: SafeArea(
                 child: Container(
@@ -669,10 +647,11 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
             // Bottom HUD panel
             Positioned(
-              bottom: 20,
+              bottom: 95,
               left: 20,
               right: 20,
               child: SafeArea(
+                bottom: false,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -724,7 +703,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                                           style: TextStyle(fontSize: 16, color: AppColors.primary.withOpacity(0.7), fontWeight: FontWeight.bold),
                                         ),
                                         TextSpan(
-                                          text: selectedRoute.fuelCostRm.toStringAsFixed(2),
+                                          text: (selectedRoute.fuelCostRm * _tripProgress).toStringAsFixed(2),
                                           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                                                 color: Colors.white,
                                                 height: 1.0,
@@ -836,7 +815,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           // Alert Overlay Text
           if (driveState.isWarning)
             Positioned(
-              top: 290,
+              top: 214,
               left: 20,
               right: 20,
               child: SafeArea(

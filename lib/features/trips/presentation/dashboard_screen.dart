@@ -172,10 +172,11 @@ class DashboardScreen extends ConsumerWidget {
 
           // 3. Bottom Sheet Drawer (Search Bar)
           Positioned(
-            bottom: 24,
+            bottom: 95,
             left: 20,
             right: 20,
             child: SafeArea(
+              bottom: false,
               child: GestureDetector(
                 onTap: () {
                   ref.read(appNavigationProvider.notifier).navigateTo(AppScreen.routeComparison);

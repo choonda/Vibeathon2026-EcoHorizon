@@ -101,6 +101,7 @@ class MainTabNavigator extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: true,
       body: IndexedStack(
         index: switch (activeTab) {
           AppTab.dashboard => 0,

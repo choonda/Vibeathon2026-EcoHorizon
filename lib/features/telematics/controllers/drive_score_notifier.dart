@@ -47,6 +47,7 @@ class DriveScoreNotifier extends StateNotifier<DriveScoreState> {
 
   final SensorRepository _sensorRepository;
   StreamSubscription<double>? _subscription;
+  Timer? _warningTimer;
 
   void startTrip() {
     state = state.copyWith(
@@ -68,30 +69,47 @@ class DriveScoreNotifier extends StateNotifier<DriveScoreState> {
       final nextScore = (state.score - ScoringRules.harshEventPenalty)
           .clamp(ScoringRules.minScore, ScoringRules.maxScore);
 
-      state = state.copyWith(score: nextScore, isWarning: true);
+      state = state.copyWith(score: nextScore);
+      _triggerWarning();
+    });
+  }
+
+  void _triggerWarning() {
+    state = state.copyWith(isWarning: true);
+    _warningTimer?.cancel();
+    _warningTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        state = state.copyWith(isWarning: false);
+      }
     });
   }
 
   void clearWarning() {
+    _warningTimer?.cancel();
+    _warningTimer = null;
     state = state.copyWith(isWarning: false);
   }
 
   void endTrip() {
     _subscription?.cancel();
     _subscription = null;
-    state = state.copyWith(isTripActive: false);
+    _warningTimer?.cancel();
+    _warningTimer = null;
+    state = state.copyWith(isTripActive: false, isWarning: false);
   }
 
   void simulateHarshEvent(double gForce) {
     if (!state.isTripActive) return;
     final penalty = ScoringRules.harshEventPenalty;
     final nextScore = (state.score - penalty).clamp(ScoringRules.minScore, ScoringRules.maxScore);
-    state = state.copyWith(score: nextScore, isWarning: true);
+    state = state.copyWith(score: nextScore);
+    _triggerWarning();
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
+    _warningTimer?.cancel();
     super.dispose();
   }
 }
