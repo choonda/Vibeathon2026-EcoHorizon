@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ecohorizon/features/navigation/controllers/map_controller.dart';
 import 'package:ecohorizon/features/navigation/models/route_option.dart';
-import 'package:ecohorizon/features/navigation/repositories/route_repository.dart';
 import 'package:ecohorizon/features/auth/controllers/profile_controller.dart';
 
 void main() {

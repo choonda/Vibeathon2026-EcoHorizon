@@ -44,10 +44,10 @@ class EcoCostCalculator {
 
     // Fuel price (RM per liter)
     final pricePerLiter = switch (fuelType.toUpperCase()) {
-      'RON95' => (subsidyTier == 'BUDI95') ? 2.05 : 3.10,
-      'RON97' => 3.47,
-      'DIESEL' => (subsidyTier == 'BUDIDIESEL' || subsidyTier == 'BUDI_DIESEL') ? 2.15 : 3.35,
-      _ => 2.05,
+      'RON95' => (subsidyTier == 'BUDI95' || subsidyTier == 'SUBSIDISED') ? 1.99 : 3.72,
+      'RON97' => 4.35,
+      'DIESEL' => (subsidyTier == 'BUDIDIESEL' || subsidyTier == 'BUDI_DIESEL' || subsidyTier == 'SUBSIDISED') ? 2.15 : 4.67,
+      _ => 1.99,
     };
 
     final litersUsed = (distanceKm * baseLtrPer100Km) / 100.0;

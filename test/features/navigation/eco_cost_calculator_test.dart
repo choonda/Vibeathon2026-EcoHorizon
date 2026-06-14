@@ -12,12 +12,12 @@ void main() {
       );
 
       // RON95 consumption = 7.2 L/100km. At 100 km/h average speed, no speed penalty.
-      // Price = RM 3.10
+      // Price = RM 3.72
       // Liters used = 7.2 L
-      // Cost = 7.2 * 3.10 = RM 22.32
+      // Cost = 7.2 * 3.72 = RM 26.78
       // Carbon = 7.2 * 2.31 = 16.63 kg
       expect(result.litersUsed, equals(7.2));
-      expect(result.fuelCostRm, equals(22.32));
+      expect(result.fuelCostRm, equals(26.78));
       expect(result.carbonKg, equals(16.63));
     });
 
@@ -29,10 +29,10 @@ void main() {
         subsidyTier: 'BUDI95',
       );
 
-      // Price = RM 2.05 (subsidized)
-      // Cost = 7.2 * 2.05 = RM 14.76
+      // Price = RM 1.99 (subsidized)
+      // Cost = 7.2 * 1.99 = RM 14.33
       expect(result.litersUsed, equals(7.2));
-      expect(result.fuelCostRm, equals(14.76));
+      expect(result.fuelCostRm, equals(14.33));
     });
 
     test('Diesel calculations with BUDIDIESEL subsidy', () {
@@ -63,10 +63,10 @@ void main() {
       // Congestion penalty multiplier = 1.25
       // Consumption = 7.2 * 1.25 = 9.0 L/100km
       // Liters used for 10km = 0.9 L
-      // Cost = 0.9 * 2.05 = RM 1.845 -> 1.85
-      // Carbon = 0.9 * 2.31 = 2.079 -> 2.08
+      // Cost = 0.9 * 1.99 = RM 1.79
+      // Carbon = 0.9 * 2.31 = 2.08
       expect(result.litersUsed, equals(0.9));
-      expect(result.fuelCostRm, equals(1.84));
+      expect(result.fuelCostRm, equals(1.79));
       expect(result.carbonKg, equals(2.08));
     });
 
@@ -82,9 +82,9 @@ void main() {
       // Eco route multiplier = 0.9
       // Consumption = 7.2 * 0.9 = 6.48 L/100km
       // Liters used = 6.48 L
-      // Cost = 6.48 * 2.05 = RM 13.284 -> 13.28
+      // Cost = 6.48 * 1.99 = RM 12.90
       expect(result.litersUsed, equals(6.48));
-      expect(result.fuelCostRm, equals(13.28));
+      expect(result.fuelCostRm, equals(12.90));
     });
 
     test('Consumption override parameter is respected', () {
@@ -97,9 +97,9 @@ void main() {
       );
 
       // Liters used = 9.5 L
-      // Cost = 9.5 * 2.05 = RM 19.475 -> 19.47 in Dart double.toStringAsFixed(2)
+      // Cost = 9.5 * 1.99 = RM 18.91
       expect(result.litersUsed, equals(9.5));
-      expect(result.fuelCostRm, equals(19.47));
+      expect(result.fuelCostRm, equals(18.91));
     });
   });
 }
