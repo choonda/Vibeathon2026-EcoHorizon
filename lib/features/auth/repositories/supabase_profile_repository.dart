@@ -29,6 +29,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       subsidyTier: response['subsidy_tier'] as String?,
       petrolPointsBalance:
           (response['petrol_points_balance'] as num?)?.toInt() ?? 0,
+      totalEcoScore: (response['total_eco_score'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -51,6 +52,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       fuelType: 'RON95',
       subsidyTier: null,
       petrolPointsBalance: 0,
+      totalEcoScore: 0,
     );
 
     await saveProfile(profile);
