@@ -16,6 +16,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController(text: 'Eco Driver');
   String _selectedFuel = 'RON95';
+
+  /// null  = not yet answered (only visible when RON95 is selected)
+  /// true  = eligible for RON95 subsidy
+  /// false = normal rate
+  bool? _ron95SubsidyEligible;
+
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -36,12 +42,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     super.dispose();
   }
 
+  void _onFuelChanged(String fuel) {
+    setState(() {
+      _selectedFuel = fuel;
+      // Reset the eligibility choice when switching fuel types
+      if (fuel != 'RON95') _ron95SubsidyEligible = null;
+    });
+  }
+
+  /// Derive the subsidyTier value to store:
+  /// - null  → RON97 / Diesel, or user chose normal rate
+  /// - 'SUBSIDISED' → eligible for RON95 subsidy
+  String? get _computedSubsidyTier {
+    if (_selectedFuel != 'RON95') return null;
+    if (_ron95SubsidyEligible == true) return 'SUBSIDISED';
+    return null; // normal rate
+  }
+
   Future<void> _submit() async {
     await ref.read(profileControllerProvider.notifier).updateProfile(
           name: _nameController.text.trim().isEmpty
               ? 'Eco Driver'
               : _nameController.text.trim(),
           fuelType: _selectedFuel,
+          subsidyTier: _computedSubsidyTier,
         );
 
     // Mark onboarding complete so re-navigation skips this screen
@@ -50,6 +74,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final showSubsidyQuestion = _selectedFuel == 'RON95';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -163,7 +189,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           final isSelected = _selectedFuel == fuel;
                           return Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => _selectedFuel = fuel),
+                              onTap: () => _onFuelChanged(fuel),
                               child: Container(
                                 margin: EdgeInsets.only(
                                     right: fuel != 'Diesel' ? 8.0 : 0.0),
@@ -197,6 +223,64 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                             ),
                           );
                         }).toList(),
+                      ),
+
+                      // ── RON95 Subsidy Eligibility (conditional) ──────────
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: showSubsidyQuestion
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  const _SectionLabel(
+                                      'RON95 Subsidy Eligibility'),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Are you eligible for the RON95 government subsidy?',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      // ── Yes — Eligible ──────────────────
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon: Icons.check_circle_rounded,
+                                          label: 'Yes, I\'m Eligible',
+                                          sublabel: 'Subsidised rate',
+                                          isSelected:
+                                              _ron95SubsidyEligible == true,
+                                          selectedColor: AppColors.primary,
+                                          onTap: () => setState(
+                                              () => _ron95SubsidyEligible =
+                                                  true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      // ── No — Normal Rate ────────────────
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon: Icons.monetization_on_rounded,
+                                          label: 'Normal Rate',
+                                          sublabel: 'Proceed without subsidy',
+                                          isSelected:
+                                              _ron95SubsidyEligible == false,
+                                          selectedColor: AppColors.warning,
+                                          onTap: () => setState(
+                                              () => _ron95SubsidyEligible =
+                                                  false),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
                       ),
                     ],
                   ),
@@ -253,6 +337,93 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.8,
+      ),
+    );
+  }
+}
+
+/// A selectable card for the two-column subsidy eligibility choice.
+class SubsidyChoiceCard extends StatelessWidget {
+  const SubsidyChoiceCard({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.isSelected,
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final bool isSelected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? selectedColor.withOpacity(0.12)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? selectedColor : AppColors.border,
+            width: isSelected ? 2.0 : 1.5,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Checkbox-style indicator at top
+            Align(
+              alignment: Alignment.topRight,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: isSelected
+                    ? Icon(Icons.check_box_rounded,
+                        key: const ValueKey(true),
+                        color: selectedColor,
+                        size: 20)
+                    : Icon(Icons.check_box_outline_blank_rounded,
+                        key: const ValueKey(false),
+                        color: AppColors.textSecondary,
+                        size: 20),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Icon(icon,
+                color: isSelected ? selectedColor : AppColors.textSecondary,
+                size: 32),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              sublabel,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isSelected
+                    ? selectedColor.withOpacity(0.8)
+                    : AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

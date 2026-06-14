@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../controllers/profile_controller.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -14,12 +15,31 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _nameController = TextEditingController();
   String _selectedFuel = 'RON95';
+
+  /// null  = not yet chosen / non-RON95 fuel
+  /// true  = eligible for RON95 subsidy
+  /// false = normal rate
+  bool? _ron95SubsidyEligible;
+
   bool _isInit = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  void _onFuelChanged(String fuel) {
+    setState(() {
+      _selectedFuel = fuel;
+      if (fuel != 'RON95') _ron95SubsidyEligible = null;
+    });
+  }
+
+  String? get _computedSubsidyTier {
+    if (_selectedFuel != 'RON95') return null;
+    if (_ron95SubsidyEligible == true) return 'SUBSIDISED';
+    return null;
   }
 
   @override
@@ -31,9 +51,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!_isInit && profile != null) {
         _nameController.text = profile.name;
         _selectedFuel = profile.fuelType;
+        // Restore eligibility choice from saved subsidyTier
+        if (profile.fuelType == 'RON95') {
+          _ron95SubsidyEligible =
+              profile.subsidyTier == 'SUBSIDISED' ? true : false;
+        }
         _isInit = true;
       }
     });
+
+    final showSubsidyQuestion = _selectedFuel == 'RON95';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -109,8 +136,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           final isSelected = _selectedFuel == fuel;
                           return Expanded(
                             child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedFuel = fuel),
+                              onTap: () => _onFuelChanged(fuel),
                               child: Container(
                                 margin: EdgeInsets.only(
                                     right: fuel != 'Diesel' ? 8.0 : 0.0),
@@ -145,6 +171,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           );
                         }).toList(),
                       ),
+
+                      // ── RON95 Subsidy Eligibility (conditional) ──────────
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: showSubsidyQuestion
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  const Text(
+                                    'RON95 SUBSIDY ELIGIBILITY',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Are you eligible for the RON95 government subsidy?',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon: Icons.check_circle_rounded,
+                                          label: 'Yes, I\'m Eligible',
+                                          sublabel: 'Subsidised rate',
+                                          isSelected:
+                                              _ron95SubsidyEligible == true,
+                                          selectedColor: AppColors.primary,
+                                          onTap: () => setState(() =>
+                                              _ron95SubsidyEligible = true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon:
+                                              Icons.monetization_on_rounded,
+                                          label: 'Normal Rate',
+                                          sublabel:
+                                              'Proceed without subsidy',
+                                          isSelected:
+                                              _ron95SubsidyEligible == false,
+                                          selectedColor: AppColors.warning,
+                                          onTap: () => setState(() =>
+                                              _ron95SubsidyEligible = false),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ],
                   ),
                 ),
@@ -163,6 +252,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   ? 'Eco Driver'
                                   : _nameController.text.trim(),
                               fuelType: _selectedFuel,
+                              subsidyTier: _computedSubsidyTier,
                               petrolPointsBalance: profile.petrolPointsBalance,
                             );
 
