@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../features/auth/controllers/profile_controller.dart';
 import '../models/apm_prediction.dart';
 import '../repositories/apm_repository.dart';
+import '../repositories/supabase_apm_repository.dart';
 
 class ApmAlertState {
   const ApmAlertState({
@@ -28,7 +31,16 @@ class ApmAlertState {
 }
 
 final apmRepositoryProvider = Provider<ApmRepository>((ref) {
-  return MockApmRepository();
+  try {
+    final client = Supabase.instance.client;
+    // Read user's fuel type to filter the correct APM alert
+    final profile = ref.watch(profileControllerProvider).valueOrNull;
+    final fuelType = profile?.fuelType ?? 'RON95';
+    return SupabaseApmRepository(client, fuelType: fuelType);
+  } catch (_) {
+    // Fallback to mock if Supabase is not yet initialized
+    return MockApmRepository();
+  }
 });
 
 final apmAlertControllerProvider =

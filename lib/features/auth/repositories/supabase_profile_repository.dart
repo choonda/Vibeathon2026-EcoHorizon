@@ -7,18 +7,13 @@ class SupabaseProfileRepository implements ProfileRepository {
   SupabaseProfileRepository(this._client);
 
   factory SupabaseProfileRepository.fromProvider() {
-    // TODO: Requires Supabase API key
-    throw UnimplementedError('Supabase is not initialized');
-    // return SupabaseProfileRepository(Supabase.instance.client);
+    return SupabaseProfileRepository(Supabase.instance.client);
   }
 
   final SupabaseClient _client;
 
   @override
   Future<UserProfile?> fetchCurrentProfile() async {
-    // TODO: Requires Supabase API key
-    return null;
-    /*
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return null;
 
@@ -27,15 +22,18 @@ class SupabaseProfileRepository implements ProfileRepository {
 
     if (response == null) return null;
 
-    return UserProfile.fromJson(response as Map<String, dynamic>);
-    */
+    return UserProfile(
+      id: response['id'] as String,
+      name: response['name'] as String? ?? 'Driver',
+      fuelType: response['fuel_type'] as String? ?? 'RON95',
+      subsidyTier: response['subsidy_tier'] as String?,
+      petrolPointsBalance:
+          (response['petrol_points_balance'] as num?)?.toInt() ?? 0,
+    );
   }
 
   @override
   Future<UserProfile> ensureCurrentProfile() async {
-    // TODO: Requires Supabase API key
-    return UserProfile.demo();
-    /*
     final existing = await fetchCurrentProfile();
     if (existing != null) {
       return existing;
@@ -53,20 +51,20 @@ class SupabaseProfileRepository implements ProfileRepository {
       fuelType: 'RON95',
       subsidyTier: null,
       petrolPointsBalance: 0,
-      totalEcoScore: 0,
     );
 
     await saveProfile(profile);
     return profile;
-    */
   }
 
   @override
   Future<void> saveProfile(UserProfile profile) async {
-    // TODO: Requires Supabase API key
-    // Uses UserProfile.toJson() which maps field names to Supabase column names.
-    /*
-    await _client.from('users').upsert(profile.toJson());
-    */
+    await _client.from('users').upsert({
+      'id': profile.id,
+      'name': profile.name,
+      'fuel_type': profile.fuelType,
+      'subsidy_tier': profile.subsidyTier,
+      'petrol_points_balance': profile.petrolPointsBalance,
+    });
   }
 }

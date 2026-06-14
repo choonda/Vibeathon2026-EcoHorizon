@@ -10,10 +10,11 @@ class SupabaseTripRepository implements TripRepository {
 
   @override
   Future<List<TripRecord>> fetchTrips(String userId) async {
-    // TODO: Requires Supabase API key
-    return [];
-    /*
-    final rows = await _client.from('trips').select().eq('user_id', userId);
+    final rows = await _client
+        .from('trips')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
     return rows
         .map<TripRecord>(
           (row) => TripRecord(
@@ -27,14 +28,19 @@ class SupabaseTripRepository implements TripRepository {
           ),
         )
         .toList();
-    */
   }
 
   @override
   Future<void> saveTrip(TripRecord record) async {
-    // TODO: Requires Supabase API key
-    /*
-    await _client.from('trips').insert(record.toJson());
-    */
+    // Exclude 'id' and 'created_at' so Supabase generates them server-side
+    await _client.from('trips').insert({
+      'user_id': record.userId,
+      'start_location': record.startLocation,
+      'end_location': record.endLocation,
+      'distance_km': record.distanceKm,
+      'eco_score': record.ecoScore,
+      'fuel_cost_rm': record.fuelCostRm,
+      'carbon_saved_kg': record.carbonSavedKg,
+    });
   }
 }
