@@ -45,7 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: SafeArea(
         child: profileState.when(
           data: (profile) => SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 110),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

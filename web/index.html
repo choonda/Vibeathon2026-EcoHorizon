@@ -32,6 +32,47 @@
   <title>ecohorizon</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPMWhXDupTZ16jVwhhtrsmZ_DhSDIX4k8"></script>
+  <style>
+    /* Hide Google Maps logo, controls, terms, copyright and keyboard shortcut controls on Web */
+    .gmnoprint,
+    .gm-style-cc,
+    .gm-style-mtc,
+    .gm-svpc,
+    .gm-fullscreen-control,
+    .gm-bundled-control,
+    .gm-bundled-control-on-bottom,
+    a[href^="https://maps.google.com/maps"],
+    a[href^="https://www.google.com/maps"],
+    .gm-style-logo,
+    a[title*="Google Maps"],
+    img[alt="Google"] {
+      display: none !important;
+    }
+  </style>
+  <script>
+    // Intercept Google Maps constructor to inject custom MapOptions (disableDefaultUI)
+    (function() {
+      const checkInterval = setInterval(function() {
+        if (window.google && window.google.maps && window.google.maps.Map) {
+          clearInterval(checkInterval);
+          const originalMap = window.google.maps.Map;
+          window.google.maps.Map = function(element, options) {
+            if (options) {
+              options.disableDefaultUI = true;
+              options.zoomControl = false;
+              options.fullscreenControl = false;
+              options.streetViewControl = false;
+              options.mapTypeControl = false;
+              options.keyboardShortcuts = false;
+            }
+            return Reflect.construct(originalMap, [element, options]);
+          };
+          window.google.maps.Map.prototype = originalMap.prototype;
+          Object.assign(window.google.maps.Map, originalMap);
+        }
+      }, 50);
+    })();
+  </script>
 </head>
 <body>
   <!--

@@ -104,6 +104,7 @@ class RewardsScreen extends ConsumerWidget {
                   // Rewards list
                   Expanded(
                     child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 90),
                       itemCount: demoRewards.length,
                       itemBuilder: (context, index) {
                         final item = demoRewards[index];
