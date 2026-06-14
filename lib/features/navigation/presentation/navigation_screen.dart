@@ -9,6 +9,8 @@ import '../../../core/network/app_navigation_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../telematics/controllers/drive_score_notifier.dart';
 import '../../rewards/controllers/reward_controller.dart';
+import '../../apm/controllers/apm_alert_controller.dart';
+import '../../auth/controllers/profile_controller.dart';
 import '../controllers/map_controller.dart';
 import '../models/route_option.dart';
 
@@ -31,6 +33,9 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   bool _isLoadingRoutes = true;
   bool _blinkOn = true;
   BitmapDescriptor? _carIcon;
+  bool _showingPetrolStation = false;
+  bool _refueledSuccess = false;
+  bool _lowFuelAlertShown = false; // prevents repeated auto-alerts per trip
 
   GoogleMapController? _googleMapController;
   late TextEditingController _searchController;
@@ -75,7 +80,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: 'Mid Valley Southkey');
+    _searchController = TextEditingController(text: 'Seri Alam, Masai, Johor');
     _initCarIcon();
     // Simulate "Cloud AI calculation" loading lag
     Timer(const Duration(milliseconds: 1500), () {
@@ -155,7 +160,14 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
   void _onMapCreated(GoogleMapController controller) {
     _googleMapController = controller;
     controller.setMapStyle(_darkMapStyle);
+    // Try to fit bounds immediately; if routes aren't ready yet the
+    // ref.listen on mapControllerProvider will handle it once they arrive.
     _fitCurrentRouteBounds();
+    // Fallback: retry after a short delay in case routes load quickly but
+    // the controller wasn't ready in time.
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) _fitCurrentRouteBounds();
+    });
   }
 
   void _fitCurrentRouteBounds() {
@@ -212,6 +224,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       _tripProgress = 0.0;
       _currentSpeed = 72.0;
       _blinkOn = true;
+      _lowFuelAlertShown = false; // reset alert guard for new trip
     });
 
     ref.read(driveScoreNotifierProvider.notifier).startTrip();
@@ -229,6 +242,13 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           _currentSpeed = 0.0;
         }
       });
+
+      // Decrease fuel level progressively (0.3% per tick)
+      final apmAlertState = ref.read(apmAlertControllerProvider).valueOrNull;
+      if (apmAlertState != null) {
+        final currentFuel = (apmAlertState.virtualTankPercentage - 0.3).clamp(0.0, 100.0);
+        ref.read(apmAlertControllerProvider.notifier).updateVirtualTank(currentFuel);
+      }
 
       // Animate camera to follow the car
       final carPos = _getCarPosition(selectedRoute.polylinePoints, _tripProgress);
@@ -252,6 +272,96 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
     
     // Haptic feedback
     HapticFeedback.vibrate();
+  }
+
+  void _showPetrolStationDetour({bool isAutoAlert = false}) {
+    if (isAutoAlert) {
+      // Brief vibration + red banner then open dialog after 2s
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(bottom: 160, left: 16, right: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Row(
+            children: [
+              const Icon(Icons.local_gas_station, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('⚠️ Fuel Low — Below 20%!',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text('Nearest station found — Petronas Masai',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      // Show the detour card after the snackbar has been visible briefly
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && !_showingPetrolStation) {
+          setState(() => _showingPetrolStation = true);
+          _googleMapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(const LatLng(1.4820, 103.8050), 14.5),
+          );
+        }
+      });
+    } else {
+      // Manual tap — open immediately
+      setState(() => _showingPetrolStation = true);
+      _googleMapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(const LatLng(1.4820, 103.8050), 14.5),
+      );
+    }
+  }
+
+  void _cancelDetour() {
+    setState(() {
+      _showingPetrolStation = false;
+    });
+    _fitCurrentRouteBounds();
+  }
+
+  void _refuelVehicle() {
+    // 1. Reset virtual tank to 100%
+    ref.read(apmAlertControllerProvider.notifier).updateVirtualTank(100.0);
+
+    // 2. Increment points balance by 50 points
+    final profile = ref.read(profileControllerProvider).value;
+    if (profile != null) {
+      ref.read(profileControllerProvider.notifier).updateProfile(
+            name: profile.name,
+            fuelType: profile.fuelType,
+            subsidyTier: profile.subsidyTier,
+            petrolPointsBalance: profile.petrolPointsBalance + 50,
+          );
+    }
+
+    setState(() {
+      _showingPetrolStation = false;
+      _refueledSuccess = true;
+      _lowFuelAlertShown = true; // don't re-alert after refuel
+    });
+
+    // Animate back to original route bounds
+    _fitCurrentRouteBounds();
+
+    // Show a success banner for 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _refueledSuccess = false;
+        });
+      }
+    });
   }
 
   void _endDriving() {
@@ -297,6 +407,49 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       }
     });
 
+    // Auto-fit camera whenever routes finish loading
+    ref.listen<MapNavigationState>(mapControllerProvider, (previous, next) {
+      final prevLoaded = previous?.routesState.value?.isNotEmpty ?? false;
+      final nextLoaded = next.routesState.value?.isNotEmpty ?? false;
+      if (!prevLoaded && nextLoaded && _googleMapController != null) {
+        final selected = next.selectedRoute;
+        if (selected != null) {
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (mounted) _fitRouteBounds(selected.polylinePoints);
+          });
+        }
+      }
+    });
+
+    // Reload route costs whenever the user changes fuel type or subsidy tier
+    ref.listen<AsyncValue<dynamic>>(profileControllerProvider, (previous, next) {
+      final prevProfile = previous?.valueOrNull;
+      final nextProfile = next.valueOrNull;
+      if (nextProfile == null) return;
+      final fuelChanged = prevProfile?.fuelType != nextProfile.fuelType;
+      final tierChanged = prevProfile?.subsidyTier != nextProfile.subsidyTier;
+      if ((fuelChanged || tierChanged) && _mapState == MapState.comparison) {
+        ref.read(mapControllerProvider.notifier).reloadWithProfile(
+          nextProfile.fuelType,
+          nextProfile.subsidyTier,
+        );
+      }
+    });
+
+    // ── Auto low-fuel alert at 20% ──────────────────────────────────────────
+    ref.listen<AsyncValue<ApmAlertState>>(apmAlertControllerProvider, (previous, next) {
+      final prevFuel = previous?.valueOrNull?.virtualTankPercentage ?? 100.0;
+      final nextFuel = next.valueOrNull?.virtualTankPercentage;
+      if (nextFuel == null) return;
+
+      // Fire once when fuel crosses below 20% during an active drive
+      final crossedThreshold = prevFuel >= 20.0 && nextFuel < 20.0;
+      if (crossedThreshold && _mapState == MapState.driving && !_lowFuelAlertShown && !_showingPetrolStation) {
+        _lowFuelAlertShown = true;
+        _showPetrolStationDetour(isAutoAlert: true);
+      }
+    });
+
     final mapState = ref.watch(mapControllerProvider);
     final routeState = mapState.routesState;
     final selectedRoute = mapState.selectedRoute ?? RouteOption.demoA();
@@ -321,6 +474,21 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
       }
     }
 
+    if (_showingPetrolStation) {
+      displayMarkers.add(
+        Marker(
+          markerId: const MarkerId('petrol_station'),
+          position: const LatLng(1.4820, 103.8050), // Petronas near Masai on the route
+          infoWindow: const InfoWindow(
+            title: 'Petronas Masai',
+            snippet: 'Eco Partner - +50 Pts Cashpack',
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+          zIndex: 4,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -329,8 +497,8 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
           Positioned.fill(
             child: GoogleMap(
               initialCameraPosition: const CameraPosition(
-                target: LatLng(1.5300, 103.7000), // Skudai region center
-                zoom: 12.0,
+                target: LatLng(1.5183, 103.7619), // Midpoint: UTM Skudai ↔ Seri Alam, Masai
+                zoom: 11.5,
               ),
               markers: displayMarkers,
               circles: displayCircles,
@@ -383,7 +551,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                                 _isLoadingRoutes = true;
                               });
                               ref.read(mapControllerProvider.notifier).loadRoutes(
-                                start: 'UTM Skudai',
+                                start: 'Universiti Teknologi Malaysia, Skudai, Johor',
                                 end: val.trim(),
                               ).then((_) {
                                 if (mounted) {
@@ -406,7 +574,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                               _isLoadingRoutes = true;
                             });
                             ref.read(mapControllerProvider.notifier).loadRoutes(
-                              start: 'UTM Skudai',
+                              start: 'Universiti Teknologi Malaysia, Skudai, Johor',
                               end: val.trim(),
                             ).then((_) {
                               if (mounted) {
@@ -724,7 +892,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('UTM Skudai', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  const Text('UTM Skudai, Johor', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                   Text(
                                     '${(_tripProgress * 100).toStringAsFixed(0)}% Complete',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
@@ -841,6 +1009,257 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
                         Text(
                           'HARSH EVENT DETECTED! -5 SCORE',
                           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // 6. Fuel Level Indicator Overlay
+          Positioned(
+            top: _mapState == MapState.driving ? 120 : 100,
+            left: 20,
+            child: SafeArea(
+              child: Consumer(
+                builder: (context, ref, child) {
+                  final apmState = ref.watch(apmAlertControllerProvider);
+                  final fuelPercentage = apmState.valueOrNull?.virtualTankPercentage ?? 100.0;
+                  final isLow = fuelPercentage < 40.0;
+                  final Color fuelColor = fuelPercentage < 20.0
+                      ? Colors.red
+                      : (isLow ? Colors.amber : AppColors.primary);
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (isLow) {
+                        _showPetrolStationDetour();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Fuel level is healthy: ${fuelPercentage.toStringAsFixed(0)}%'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isLow ? Colors.amber.withOpacity(0.8) : AppColors.border,
+                          width: isLow ? 2.0 : 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isLow ? Colors.amber.withOpacity(0.15) : Colors.black26,
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_gas_station_rounded,
+                            color: fuelColor,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'FUEL LEVEL',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${fuelPercentage.toStringAsFixed(0)}%',
+                                    style: TextStyle(
+                                      color: fuelColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (isLow) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.amber,
+                                      size: 14,
+                                    ),
+                                  ]
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // 7. Detour Dialog Overlay
+          if (_showingPetrolStation)
+            Positioned(
+              bottom: 95,
+              left: 20,
+              right: 20,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.amber, width: 2.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.local_gas_station_rounded, color: Colors.amber, size: 24),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Low Fuel Alert',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Petronas Masai is 1.5km away.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Would you like to detour and refuel now? You will earn +50 Petrol Points for using this partner station.',
+                        style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.border),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: _cancelDetour,
+                              child: const Text('No, Skip'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: _refuelVehicle,
+                              child: const Text('Reroute & Refuel'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 8. Refueled Success Banner Overlay
+          if (_refueledSuccess)
+            Positioned(
+              top: 24,
+              left: 20,
+              right: 20,
+              child: SafeArea(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Refueled Successfully!',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '+50 Petrol Points added to balance.',
+                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
+                            ),
+                          ],
                         ),
                       ],
                     ),

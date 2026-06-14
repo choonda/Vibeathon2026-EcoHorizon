@@ -14,11 +14,8 @@ class GoogleMapsRouteRepository implements RouteRepository {
     String fuelType = 'RON95',
     String? subsidyTier,
   }) async {
-    const apiKey = String.fromEnvironment('MAPS_API_KEY');
-
-    if (apiKey.isEmpty || apiKey == 'demo') {
-      return _loadFallbackRoutes(fuelType, subsidyTier);
-    }
+    const apiKey = 'AIzaSyAPMWhXDupTZ16jVwhhtrsmZ_DhSDIX4k8';
+    // Key is also set in web/index.html for the map tiles renderer
 
     try {
       final url = Uri.parse(
@@ -26,6 +23,7 @@ class GoogleMapsRouteRepository implements RouteRepository {
         '?origin=${Uri.encodeComponent(start)}'
         '&destination=${Uri.encodeComponent(end)}'
         '&alternatives=true'
+        '&region=my'
         '&key=$apiKey'
       );
 
@@ -64,6 +62,7 @@ class GoogleMapsRouteRepository implements RouteRepository {
           fuelType: fuelType,
           subsidyTier: subsidyTier,
           isEcoFriendlyRoute: isEco,
+          consumptionOverrideLper100km: isEco ? null : 9.5,
         );
 
         final points = _decodePolyline(overviewPolyline);
@@ -95,6 +94,7 @@ class GoogleMapsRouteRepository implements RouteRepository {
           fuelType: fuelType,
           subsidyTier: subsidyTier,
           isEcoFriendlyRoute: false,
+          consumptionOverrideLper100km: 9.5,
         );
 
         final shiftedPoints = first.polylinePoints.map((p) {
@@ -120,24 +120,29 @@ class GoogleMapsRouteRepository implements RouteRepository {
   }
 
   List<RouteOption> _loadFallbackRoutes(String fuelType, String? subsidyTier) {
+    // Use the same distances as the demo polyline routes
+    final baseEcoRoute = RouteOption.demoA(); // 24.3 km, 34 min
+    final baseFastRoute = RouteOption.demoB(); // 21.8 km, 24 min
+
+    // Default to subsidised RON95 if no profile subsidy tier set
+    final effectiveTier = (subsidyTier?.isNotEmpty == true) ? subsidyTier : 'BUDI95';
+
     final ecoCalc = EcoCostCalculator.calculate(
-      distanceKm: 12.4,
-      durationMinutes: 24,
+      distanceKm: baseEcoRoute.distanceKm,
+      durationMinutes: baseEcoRoute.durationMinutes,
       fuelType: fuelType,
-      subsidyTier: subsidyTier,
+      subsidyTier: effectiveTier,
       isEcoFriendlyRoute: true,
     );
 
     final fastCalc = EcoCostCalculator.calculate(
-      distanceKm: 11.2,
-      durationMinutes: 18,
+      distanceKm: baseFastRoute.distanceKm,
+      durationMinutes: baseFastRoute.durationMinutes,
       fuelType: fuelType,
-      subsidyTier: subsidyTier,
+      subsidyTier: effectiveTier,
       isEcoFriendlyRoute: false,
+      consumptionOverrideLper100km: 9.5,
     );
-
-    final baseEcoRoute = RouteOption.demoA();
-    final baseFastRoute = RouteOption.demoB();
 
     return [
       RouteOption(

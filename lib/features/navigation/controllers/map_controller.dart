@@ -82,21 +82,50 @@ class MapController extends StateNotifier<MapNavigationState> {
 
   Future<void> loadDemoRoutes() async {
     state = state.copyWith(routesState: const AsyncValue.loading());
-    
+
     final userProfile = _ref.read(profileControllerProvider).value;
     final fuelType = userProfile?.fuelType ?? 'RON95';
     final subsidyTier = userProfile?.subsidyTier;
 
     try {
       final routes = await _repository.fetchRouteOptions(
-        start: 'UTM Skudai',
-        end: 'Mid Valley Southkey',
+        start: 'Universiti Teknologi Malaysia, Skudai, Johor',
+        end: 'Seri Alam, Masai, Johor',
         fuelType: fuelType,
         subsidyTier: subsidyTier,
       );
+      if (!mounted) return;
       _updateMapData(routes);
     } catch (e, stack) {
+      if (!mounted) return;
       state = state.copyWith(routesState: AsyncValue.error(e, stack));
+    }
+  }
+
+  /// Re-fetch the current route with updated fuel type / subsidy tier from profile.
+  /// Called whenever the user changes fuel settings in Settings screen.
+  Future<void> reloadWithProfile(String fuelType, String? subsidyTier) async {
+    // Keep existing polylines visible while recalculating costs
+    final existingRoutes = state.routesState.value;
+    state = state.copyWith(routesState: const AsyncValue.loading());
+
+    try {
+      final routes = await _repository.fetchRouteOptions(
+        start: 'Universiti Teknologi Malaysia, Skudai, Johor',
+        end: 'Seri Alam, Masai, Johor',
+        fuelType: fuelType,
+        subsidyTier: subsidyTier,
+      );
+      if (!mounted) return;
+      _updateMapData(routes);
+    } catch (e, stack) {
+      if (!mounted) return;
+      // Restore previous routes on error to avoid blank screen
+      if (existingRoutes != null) {
+        state = state.copyWith(routesState: AsyncValue.data(existingRoutes));
+      } else {
+        state = state.copyWith(routesState: AsyncValue.error(e, stack));
+      }
     }
   }
 

@@ -33,6 +33,7 @@ class MockRouteRepository implements RouteRepository {
       fuelType: fuelType,
       subsidyTier: subsidyTier,
       isEcoFriendlyRoute: false,
+      consumptionOverrideLper100km: 9.5,
     );
 
     final baseEcoRoute = RouteOption.demoA();
