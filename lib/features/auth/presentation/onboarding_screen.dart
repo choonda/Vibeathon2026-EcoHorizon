@@ -22,6 +22,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   /// false = normal rate
   bool? _ron95SubsidyEligible;
 
+  /// null  = not yet chosen / non-Diesel fuel
+  /// true  = eligible for Diesel subsidy (rate of 2.15)
+  /// false = normal rate (rate of 3.35)
+  bool? _dieselSubsidyEligible;
+
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -47,15 +52,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       _selectedFuel = fuel;
       // Reset the eligibility choice when switching fuel types
       if (fuel != 'RON95') _ron95SubsidyEligible = null;
+      if (fuel != 'Diesel') _dieselSubsidyEligible = null;
     });
   }
 
   /// Derive the subsidyTier value to store:
   /// - null  → RON97 / Diesel, or user chose normal rate
-  /// - 'SUBSIDISED' → eligible for RON95 subsidy
+  /// - 'BUDI95' → eligible for RON95 subsidy
+  /// - 'BUDIDIESEL' → eligible for Diesel subsidy
   String? get _computedSubsidyTier {
-    if (_selectedFuel != 'RON95') return null;
-    if (_ron95SubsidyEligible == true) return 'SUBSIDISED';
+    if (_selectedFuel == 'RON95' && _ron95SubsidyEligible == true) return 'BUDI95';
+    if (_selectedFuel == 'Diesel' && _dieselSubsidyEligible == true) return 'BUDIDIESEL';
     return null; // normal rate
   }
 
@@ -273,6 +280,62 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                                           selectedColor: AppColors.warning,
                                           onTap: () => setState(
                                               () => _ron95SubsidyEligible =
+                                                  false),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+
+                      // ── Diesel Subsidy Eligibility (conditional) ──────────
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: _selectedFuel == 'Diesel'
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  const _SectionLabel(
+                                      'Diesel Subsidy Eligibility'),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Are you eligible for the Diesel government subsidy?',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon: Icons.check_circle_rounded,
+                                          label: 'Yes, I\'m Eligible',
+                                          sublabel: 'Subsidised rate (RM2.15/L)',
+                                          isSelected:
+                                              _dieselSubsidyEligible == true,
+                                          selectedColor: AppColors.primary,
+                                          onTap: () => setState(
+                                              () => _dieselSubsidyEligible =
+                                                  true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: SubsidyChoiceCard(
+                                          icon: Icons.monetization_on_rounded,
+                                          label: 'Normal Rate',
+                                          sublabel: 'Proceed without subsidy (RM3.35/L)',
+                                          isSelected:
+                                              _dieselSubsidyEligible == false,
+                                          selectedColor: AppColors.warning,
+                                          onTap: () => setState(
+                                              () => _dieselSubsidyEligible =
                                                   false),
                                         ),
                                       ),
