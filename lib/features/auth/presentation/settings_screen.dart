@@ -17,6 +17,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _nameController = TextEditingController();
   String _selectedFuel = 'RON95';
   bool _hasBudiSubsidy = true;
+  bool _hasDieselSubsidy = false;
   bool _isInit = false;
 
   @override
@@ -34,7 +35,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!_isInit && profile != null) {
         _nameController.text = profile.name;
         _selectedFuel = profile.fuelType;
-        _hasBudiSubsidy = profile.subsidyTier == 'BUDI95';
+        _hasBudiSubsidy = profile.subsidyTier == 'BUDI95' || profile.subsidyTier == 'SUBSIDISED';
+        _hasDieselSubsidy = profile.subsidyTier == 'BUDIDIESEL' || profile.subsidyTier == 'BUDI_DIESEL';
         _isInit = true;
       }
     });
@@ -120,6 +122,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 if (fuel != 'RON95') {
                                   _hasBudiSubsidy = false;
                                 }
+                                if (fuel != 'Diesel') {
+                                  _hasDieselSubsidy = false;
+                                }
                               }),
                               child: Container(
                                 margin: EdgeInsets.only(
@@ -177,7 +182,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14)),
                                     SizedBox(height: 2),
-                                    Text('BUDI Madani Subsidy',
+                                    Text('BUDI Madani Subsidy (RM1.99/L vs RM3.72/L)',
                                         style: TextStyle(
                                             color: AppColors.textSecondary,
                                             fontSize: 11)),
@@ -189,6 +194,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 activeColor: AppColors.primary,
                                 onChanged: (val) =>
                                     setState(() => _hasBudiSubsidy = val),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (_selectedFuel == 'Diesel') ...[
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: AppColors.border, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Eligible for Diesel Subsidy?',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14)),
+                                    SizedBox(height: 2),
+                                    Text('Diesel Subsidy (RM2.15/L vs RM4.67/L)',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              Switch.adaptive(
+                                value: _hasDieselSubsidy,
+                                activeColor: AppColors.primary,
+                                onChanged: (val) =>
+                                    setState(() => _hasDieselSubsidy = val),
                               ),
                             ],
                           ),
@@ -259,8 +305,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   ? 'Eco Driver'
                                   : _nameController.text.trim(),
                               fuelType: _selectedFuel,
-                              subsidyTier:
-                                  (_selectedFuel == 'RON95' && _hasBudiSubsidy) ? 'BUDI95' : null,
+                              subsidyTier: (_selectedFuel == 'RON95' && _hasBudiSubsidy)
+                                  ? 'BUDI95'
+                                  : (_selectedFuel == 'Diesel' && _hasDieselSubsidy)
+                                      ? 'BUDIDIESEL'
+                                      : null,
                               petrolPointsBalance:
                                   profile.petrolPointsBalance,
                             );

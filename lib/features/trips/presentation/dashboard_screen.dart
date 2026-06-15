@@ -64,7 +64,7 @@ class DashboardScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${profile?.fuelType ?? 'RON95'} | ${profile?.subsidyTier == 'SUBSIDISED' ? 'BUDI MADANI' : 'Standard Rate'}',
+                                    '${profile?.fuelType ?? 'RON95'} | ${(profile?.subsidyTier == 'SUBSIDISED' || profile?.subsidyTier == 'BUDI95' || profile?.subsidyTier == 'BUDIDIESEL' || profile?.subsidyTier == 'BUDI_DIESEL') ? 'BUDI MADANI' : 'Standard Rate'}',
                                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                   ),
                                 ],
