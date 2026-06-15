@@ -1,7 +1,7 @@
 # Project Proposal: EcoHorizon
 
 ## 1. Executive Summary
-**EcoHorizon** is an active, eco-conscious navigation ecosystem designed for the VIBEATHON 2026 challenge. It transitions drivers from passive fuel consumers to active participants in sustainable mobility. By combining real-time navigation, Automatic Pricing Mechanism (APM) forecasting, smartphone sensor-based telematics, and a gamified reward loop, EcoHorizon empowers Malaysian drivers to minimize fuel costs, optimize refuelling strategies, and tangibly reduce their carbon footprint without requiring external OBD-II hardware.
+**EcoHorizon** is an active, eco-conscious navigation ecosystem designed for the VIBEATHON 2026 challenge. It transitions drivers from passive fuel consumers to active participants in sustainable mobility. By combining real-time navigation, Automatic Pricing Mechanism (APM) forecasting, smartphone sensor-based telematics, and a gamified reward loop, EcoHorizon empowers Malaysian drivers to minimize fuel costs, optimize refuelling strategies, and tangibly reduce their carbon footprint.
 
 ---
 
