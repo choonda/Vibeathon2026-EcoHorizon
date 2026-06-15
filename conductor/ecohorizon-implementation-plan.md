@@ -1,7 +1,7 @@
 # EcoHorizon Implementation Plan
 
 ## 1. Background & Motivation
-EcoHorizon is an active, eco-conscious navigation ecosystem designed for the VIBEATHON 2026 challenge. The application aims to transition Malaysian drivers from passive fuel consumers to active participants in sustainable mobility. The solution provides real-time navigation, Automatic Pricing Mechanism (APM) forecasting, smartphone sensor-based telematics, and a gamified reward loop, without requiring external OBD-II hardware.
+EcoHorizon is an active, eco-conscious navigation ecosystem designed for the VIBEATHON 2026 challenge. The application aims to transition Malaysian drivers from passive fuel consumers to active participants in sustainable mobility. The solution provides real-time navigation, Automatic Pricing Mechanism (APM) forecasting, smartphone sensor-based telematics, and a gamified reward loop.
 
 ## 2. Scope & Impact
 The scope of this implementation covers a 48-hour hackathon timeframe to build a high-fidelity Proof of Concept (PoC) using Flutter for the mobile app and Supabase for the backend. 
